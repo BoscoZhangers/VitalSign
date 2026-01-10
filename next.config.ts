@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Intentionally empty for now.
+  // No special webpack config needed - using direct REST API calls instead of SDK
 };
 
 export default nextConfig;
