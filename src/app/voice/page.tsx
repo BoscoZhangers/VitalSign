@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { speakText } from "@/src/modules/elevenlabs";
+import HandTracker from "@/src/HandTracker";
 
 const VOICES = {
   girl: { id: "kdmDKE6EkgrWrrykO9Qt", label: "Girl Voice" },
@@ -78,11 +79,22 @@ export default function VoicePage() {
     }
   };
 
+  const handleSentenceComplete = (completedText: string) => {
+    // When pause detected, populate the text input with completed sign language text
+    setText(completedText);
+  };
+
   return (
-    <div style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}>
+    <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
       <h1 style={{ marginBottom: "2rem", fontSize: "2rem", fontWeight: "bold" }}>
         Voice
       </h1>
+      
+      {/* HandTracker for sign language input */}
+      <div style={{ marginBottom: "2rem" }}>
+        <HandTracker onSentenceComplete={handleSentenceComplete} compact={true} />
+      </div>
+
       <form onSubmit={handleRefine} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         <input
           type="text"
