@@ -1,2 +1,2 @@
 export * from "./voices";
-export * from "./client";
+export { speakText } from "./client";

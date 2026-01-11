@@ -13,7 +13,6 @@ export default function Home() {
       }}>
         <HandTracker />
       </div>
-
     </main>
   );
 }
