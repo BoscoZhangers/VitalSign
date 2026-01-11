@@ -20,7 +20,7 @@ export function TranscriptPanel({ history, onClear }: TranscriptPanelProps) {
   }, [history]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       
       {/* HEADER */}
       <div style={{ 
@@ -48,7 +48,7 @@ export function TranscriptPanel({ history, onClear }: TranscriptPanelProps) {
       </div>
 
       {/* LIST */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
         {history.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#64748b', marginTop: '40px' }}>
             <p>No speech detected yet.</p>
@@ -88,22 +88,6 @@ export function TranscriptPanel({ history, onClear }: TranscriptPanelProps) {
           ))
         )}
         <div ref={endRef} />
-      </div>
-
-      {/* FOOTER ACTIONS */}
-      <div style={{ padding: '20px', borderTop: '1px solid #334155' }}>
-        <button style={{ 
-          width: '100%', 
-          padding: '12px', 
-          background: '#3b82f6', 
-          color: 'white', 
-          border: 'none', 
-          borderRadius: '8px', 
-          fontWeight: '600', 
-          cursor: 'pointer' 
-        }}>
-          🔊 Read Aloud
-        </button>
       </div>
     </div>
   );

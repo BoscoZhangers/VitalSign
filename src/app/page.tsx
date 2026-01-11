@@ -163,7 +163,8 @@ export default function Home() {
           border: '1px solid #334155', 
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          minHeight: 0
         }}>
           <TranscriptPanel history={transcript} onClear={clearTranscript} />
         </div>
