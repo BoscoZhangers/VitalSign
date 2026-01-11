@@ -85,3 +85,24 @@ body {
     transform: translateX(-180px);
   }
 }
+/* src/app/globals.css */
+
+/* ... (Keep your existing :root variables here) ... */
+
+/* LIGHT MODE OVERRIDES */
+body.light-mode {
+  /* Swap dark backgrounds for light ones */
+  --vs-bg: #f3f5f7;            /* Light gray main background */
+  --vs-surface: #ffffff;       /* Pure white panels/navbar */
+  --vs-surface-2: #eef1f3;     /* Secondary elements */
+  
+  /* Swap light text for dark text */
+  --vs-text: #1a1a1a;          /* Almost black text */
+  --vs-muted: #64748b;         /* Muted gray text */
+  
+  /* Darker border for contrast against white */
+  --vs-border: #e2e8f0;        
+  
+  /* Accent adjustment (slightly darker teal for readability on white) */
+  --vs-accent: #208b80;        
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import HandTracker from '../HandTracker';
 import { TranscriptPanel } from '../ui/components/TranscriptPanel';
 import { CameraPanel } from '../ui/components/CameraPanel';
@@ -9,7 +9,7 @@ async function playAudioInBrowser(audioBuffer: ArrayBuffer, volume: number = 100
   const blob = new Blob([audioBuffer], { type: "audio/mpeg" });
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
-  audio.volume = Math.max(0, Math.min(1, volume / 100)); // Clamp volume between 0 and 1
+  audio.volume = Math.max(0, Math.min(1, volume / 100)); 
 
   return new Promise((resolve, reject) => {
     audio.onended = () => {
@@ -30,30 +30,33 @@ const VOICES = {
 };
 
 export default function Home() {
-  // Store the history of translated sentences
   const [transcript, setTranscript] = useState<{ text: string; emotion: string; timestamp: number }[]>([]);
   const [voice, setVoice] = useState<"female" | "male">("female");
-  const [volume, setVolume] = useState(100); // Volume from 0 to 100
+  const [volume, setVolume] = useState(100);
+  
+  // 1. ADD STATE FOR PROCESSING VISUALS
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const volumeRef = useRef(100);
   const pipelineInFlight = useRef(false);
 
-  // Callback when HandTracker finishes a sentence
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
   const handleSentenceComplete = (text: string, emotion?: string) => {
     void (async () => {
       const raw = (text ?? "").trim();
       if (!raw) return;
       if (pipelineInFlight.current) return;
       pipelineInFlight.current = true;
+      
+      // 2. TRIGGER THINKING STATE (Do not add raw text to transcript)
+      setIsProcessing(true);
 
       const emotionLabel = (emotion ?? "Neutral").trim();
 
-      // 1) Save + append raw dialogue chunk to transcript
-      setTranscript(prev => [
-        ...prev,
-        { text: raw, emotion: emotionLabel, timestamp: Date.now() }
-      ]);
-
       try {
-        // 2) Process with Cohere (refine into natural, speakable text)
         const basePrompt = [
           'You are a helpful assistant that rewrites sign-language translations into a clear, natural sentence.',
           'Return ONLY plain text. No markdown, no code blocks, no extra commentary.',
@@ -61,6 +64,7 @@ export default function Home() {
         ].join('\n');
 
         const fullPrompt = `${basePrompt}\n\nRaw Text: ${JSON.stringify(raw)}${emotionLabel ? `\nDetected Emotion: ${emotionLabel}` : ''}`;
+        
         const refineResponse = await fetch("/api/cohere", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -68,46 +72,39 @@ export default function Home() {
         });
 
         if (!refineResponse.ok) {
-          const err = await refineResponse.json().catch(() => ({}));
-          const message =
-            typeof err?.error === "string" && err.error.trim()
-              ? err.error
-              : "Failed to process with Cohere";
-          const details = typeof err?.details === "string" ? err.details.trim() : "";
-          throw new Error(details ? `${message}: ${details}` : message);
+          throw new Error("Failed to process with Cohere");
         }
 
         const refineData = await refineResponse.json();
         const refined = String(refineData?.text ?? "").trim();
 
         if (refined) {
-          // 3) Append the processed text as an AI/system turn
+          // 3. ADD ONLY THE AI RESULT
           setTranscript(prev => [
             ...prev,
             { text: refined, emotion: emotionLabel || "AI", timestamp: Date.now() }
           ]);
 
-          // 4) Speak it out with ElevenLabs (server-side) (only if volume > 0)
-          if (volume > 0) {
+          const currentVolume = volumeRef.current;
+          if (currentVolume > 0) {
             const speakResponse = await fetch("/api/speak", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ text: refined, emotion: emotionLabel, voiceId: VOICES[voice].id })
             });
 
-            if (!speakResponse.ok) {
-              const detail = await speakResponse.text().catch(() => "");
-              throw new Error(detail || "Failed to speak text");
+            if (speakResponse.ok) {
+              const audioBuffer = await speakResponse.arrayBuffer();
+              await playAudioInBrowser(audioBuffer, currentVolume);
             }
-
-            const audioBuffer = await speakResponse.arrayBuffer();
-            await playAudioInBrowser(audioBuffer, volume);
           }
         }
       } catch (e) {
         console.error("Pipeline error:", e);
       } finally {
+        // 4. STOP THINKING ANIMATION
         pipelineInFlight.current = false;
+        setIsProcessing(false);
       }
     })();
   };
@@ -122,28 +119,10 @@ export default function Home() {
       display: 'flex',
       flexDirection: 'column',
       fontFamily: 'system-ui, sans-serif',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      paddingTop: '80px' 
     }}>
-      {/* HEADER */}
-      <header style={{ 
-        padding: '16px 32px', 
-        borderBottom: '1px solid var(--vs-border)', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        background: 'var(--vs-surface)',
-        backdropFilter: 'blur(10px)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: 10, height: 10, background: 'var(--vs-accent)', borderRadius: '50%', boxShadow: '0 0 12px var(--vs-accent), 0 0 4px var(--vs-accent)' }} />
-          <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '600', letterSpacing: '-0.75px' }}>VitalSign</h1>
-        </div>
-        <div style={{ fontSize: '13px', color: 'var(--vs-muted)', fontWeight: '500' }}>
-          System Operational
-        </div>
-      </header>
-
-      {/* MAIN CONTENT GRID */}
+      
       <div style={{ 
         flex: 1, 
         display: 'grid', 
@@ -166,7 +145,6 @@ export default function Home() {
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)'
         }}>
           <CameraPanel>
-            {/* We pass compact=true so HandTracker fits inside this panel nicely */}
             <HandTracker 
               onSentenceComplete={handleSentenceComplete} 
               compact={true} 
@@ -192,6 +170,7 @@ export default function Home() {
             onVoiceChange={setVoice}
             volume={volume}
             onVolumeChange={setVolume}
+            isProcessing={isProcessing} // <--- PASS THE STATE PROP
           />
         </div>
 

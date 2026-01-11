@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+"use client";
+
+import React, { useEffect, useRef } from 'react';
 
 interface TranscriptItem {
   text: string;
@@ -10,199 +12,262 @@ interface TranscriptPanelProps {
   history: TranscriptItem[];
   onClear: () => void;
   voice: "female" | "male";
-  onVoiceChange: (voice: "female" | "male") => void;
+  onVoiceChange: (v: "female" | "male") => void;
   volume: number;
-  onVolumeChange: (volume: number) => void;
+  onVolumeChange: (val: number) => void;
+  isProcessing: boolean; // <--- NEW PROP
 }
 
-export function TranscriptPanel({ history, onClear, voice, onVoiceChange, volume, onVolumeChange }: TranscriptPanelProps) {
-  const endRef = useRef<HTMLDivElement>(null);
+export function TranscriptPanel({ 
+  history, 
+  onClear, 
+  voice, 
+  onVoiceChange,
+  volume,
+  onVolumeChange,
+  isProcessing // <--- Destructure new prop
+}: TranscriptPanelProps) {
+  
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when history updates
+  // Scroll to bottom when history changes OR when processing starts
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history]);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [history, isProcessing]);
 
   return (
     <>
-      <style>{`
-        .volume-slider {
+      <style jsx>{`
+        /* CUSTOM RANGE SLIDER */
+        input[type=range] {
           -webkit-appearance: none;
-          appearance: none;
-          width: 120px;
+          width: 100%;
+          background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: var(--vs-accent);
+          cursor: pointer;
+          margin-top: -6px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+          transform: scale(1.1);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+          width: 100%;
+          height: 4px;
+          cursor: pointer;
+          background: rgba(128,128,128,0.3);
+          border-radius: 2px;
+        }
+
+        /* THINKING DOTS ANIMATION */
+        .dot-flashing {
+          position: relative;
+          width: 6px;
           height: 6px;
-          border-radius: 3px;
-          background: linear-gradient(to right, var(--vs-accent) 0%, var(--vs-accent) ${volume}%, var(--vs-border) ${volume}%, var(--vs-border) 100%);
-          outline: none;
-          cursor: pointer;
+          border-radius: 5px;
+          background-color: var(--vs-accent);
+          color: var(--vs-accent);
+          animation: dot-flashing 1s infinite linear alternate;
+          animation-delay: 0.5s;
         }
-        .volume-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: var(--vs-accent);
-          cursor: pointer;
-          border: 2px solid var(--vs-bg);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        .dot-flashing::before, .dot-flashing::after {
+          content: '';
+          display: inline-block;
+          position: absolute;
+          top: 0;
         }
-        .volume-slider::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: var(--vs-accent);
-          cursor: pointer;
-          border: 2px solid var(--vs-bg);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        .dot-flashing::before {
+          left: -12px;
+          width: 6px;
+          height: 6px;
+          border-radius: 5px;
+          background-color: var(--vs-accent);
+          color: var(--vs-accent);
+          animation: dot-flashing 1s infinite alternate;
+          animation-delay: 0s;
+        }
+        .dot-flashing::after {
+          left: 12px;
+          width: 6px;
+          height: 6px;
+          border-radius: 5px;
+          background-color: var(--vs-accent);
+          color: var(--vs-accent);
+          animation: dot-flashing 1s infinite alternate;
+          animation-delay: 1s;
+        }
+        @keyframes dot-flashing {
+          0% { background-color: var(--vs-accent); }
+          50%, 100% { background-color: rgba(47, 154, 143, 0.2); }
         }
       `}</style>
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      
-      {/* HEADER */}
-      <div style={{ 
-        padding: '20px 24px', 
-        borderBottom: '1px solid var(--vs-border)', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        background: 'rgba(0, 0, 0, 0.2)'
-      }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '600', letterSpacing: '-0.5px' }}>Transcript</h2>
-        <button 
-          onClick={onClear}
-          style={{ 
-            background: 'rgba(var(--vs-red-rgb), 0.1)', 
-            border: '1px solid rgba(var(--vs-red-rgb), 0.3)', 
-            color: 'var(--vs-red)', 
-            padding: '6px 14px', 
-            borderRadius: '8px', 
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Clear
-        </button>
-      </div>
 
-      {/* LIST */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {history.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--vs-muted-2)', marginTop: '60px' }}>
-            <p style={{ fontSize: '14px', marginBottom: '8px' }}>No speech detected yet.</p>
-            <p style={{ fontSize: '12px', opacity: 0.7 }}>Sign to the camera to begin translation.</p>
-          </div>
-        ) : (
-          history.map((item, i) => (
-            <div key={i} style={{ 
-              background: 'var(--vs-surface-2)', 
-              padding: '16px 18px', 
-              borderRadius: '14px', 
-              borderLeft: '3px solid var(--vs-red)',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        height: '100%', 
+        background: 'rgba(0,0,0,0.02)',
+        position: 'relative'
+      }}>
+        
+        {/* 1. TOP BAR */}
+        <div style={{ 
+          padding: '16px 24px', 
+          borderBottom: '1px solid var(--vs-border)',
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          background: 'var(--vs-surface)',
+          borderTopRightRadius: '20px',
+          borderTopLeftRadius: '20px'
+        }}>
+          <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--vs-text)' }}>
+            Transcript History
+          </h2>
+          <button 
+            onClick={onClear}
+            style={{ 
+              background: 'transparent', 
+              border: '1px solid var(--vs-border)', 
+              color: 'var(--vs-muted)', 
+              padding: '6px 14px', 
+              borderRadius: '20px', 
+              fontSize: '12px', 
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            Clear All
+          </button>
+        </div>
+
+        {/* 2. SCROLLABLE LIST */}
+        <div style={{ 
+          flex: 1, 
+          overflowY: 'auto', 
+          padding: '24px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '16px',
+          scrollBehavior: 'smooth'
+        }}>
+          {history.length === 0 && !isProcessing ? (
+            <div style={{ 
+              flex: 1, 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              color: 'var(--vs-muted)', 
+              opacity: 0.7,
+              gap: '12px'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-                <span style={{ 
-                  fontSize: '10px', 
-                  textTransform: 'uppercase', 
-                  color: 'var(--vs-muted-2)', 
-                  fontWeight: '600',
-                  letterSpacing: '0.5px' 
+              <span style={{ fontSize: '24px' }}>💬</span>
+              <span style={{ fontSize: '15px' }}>Ready to translate...</span>
+            </div>
+          ) : (
+            history.map((item, i) => (
+              <div key={i} style={{ 
+                background: 'var(--vs-surface)',
+                border: '1px solid var(--vs-border)',
+                borderRadius: '16px',
+                padding: '20px',
+                paddingTop: '42px',
+                width: '100%',
+                position: 'relative',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                transition: 'transform 0.2s ease'
+              }}>
+                <div style={{ 
+                  position: 'absolute', top: '14px', left: '18px',
+                  fontSize: '12px', color: 'var(--vs-muted)', fontWeight: '600', opacity: 0.8
                 }}>
                   {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                <span style={{ 
-                  fontSize: '11px', 
-                  background: item.emotion === 'Happy' ? 'rgba(var(--vs-accent-rgb), 0.15)' : item.emotion === 'Sad' ? 'rgba(var(--vs-accent-blue-rgb), 0.15)' : 'rgba(255, 255, 255, 0.05)', 
-                  padding: '4px 10px', 
-                  borderRadius: '12px',
-                  border: `1px solid ${item.emotion === 'Happy' ? 'rgba(var(--vs-accent-rgb), 0.3)' : item.emotion === 'Sad' ? 'rgba(var(--vs-accent-blue-rgb), 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                  color: item.emotion === 'Happy' ? 'var(--vs-accent)' : item.emotion === 'Sad' ? 'var(--vs-accent-blue)' : 'var(--vs-muted)',
-                  fontWeight: '600' 
+                </div>
+                <div style={{
+                  position: 'absolute', top: '12px', right: '12px',
+                  background: 'rgba(47, 154, 143, 0.1)',
+                  border: '1px solid rgba(47, 154, 143, 0.2)',
+                  borderRadius: '20px', padding: '4px 12px',
+                  fontSize: '11px', fontWeight: '700', color: 'var(--vs-accent)',
+                  textTransform: 'uppercase', letterSpacing: '0.5px'
                 }}>
-                  {item.emotion || "Neutral"}
-                </span>
+                  {item.emotion || 'NEUTRAL'}
+                </div>
+                <div style={{ fontSize: '16px', lineHeight: '1.6', color: 'var(--vs-text)' }}>
+                  {item.text}
+                </div>
               </div>
-              <p style={{ margin: 0, lineHeight: '1.6', fontSize: '14px', color: 'rgba(248, 250, 252, 0.95)' }}>
-                {item.text}
-              </p>
-            </div>
-          ))
-        )}
-        <div ref={endRef} />
-      </div>
+            ))
+          )}
 
-      {/* FOOTER WITH CONTROLS */}
-      <div style={{
-        padding: '20px 28px',
-        borderTop: '1px solid var(--vs-border)',
-        background: 'rgba(0, 0, 0, 0.2)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '24px'
-      }}>
-        {/* Voice Selection */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ fontSize: '14px', color: 'var(--vs-muted)', fontWeight: '600' }}>Voice:</span>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              onClick={() => onVoiceChange('female')}
-              style={{
-                background: voice === 'female' ? 'var(--vs-accent)' : 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${voice === 'female' ? 'var(--vs-accent)' : 'var(--vs-border)'}`,
-                color: voice === 'female' ? '#000' : 'var(--vs-text)',
-                padding: '8px 16px',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Female
-            </button>
-            <button
-              onClick={() => onVoiceChange('male')}
-              style={{
-                background: voice === 'male' ? 'var(--vs-accent)' : 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${voice === 'male' ? 'var(--vs-accent)' : 'var(--vs-border)'}`,
-                color: voice === 'male' ? '#000' : 'var(--vs-text)',
-                padding: '8px 16px',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Male
-            </button>
+          {/* THINKING BUBBLE (Only visible when isProcessing is true) */}
+          {isProcessing && (
+             <div style={{ 
+                alignSelf: 'flex-start',
+                background: 'var(--vs-surface)',
+                border: '1px solid var(--vs-border)',
+                borderRadius: '16px',
+                borderBottomLeftRadius: '4px', // Speech bubble look
+                padding: '16px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: 'fit-content',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+             }}>
+               <span style={{ fontSize: '12px', color: 'var(--vs-muted)', marginRight: '8px', fontWeight: '600' }}>AI is thinking</span>
+               <div className="dot-flashing" style={{ marginLeft: '12px' }}></div>
+             </div>
+          )}
+          
+          <div ref={bottomRef} />
+        </div>
+
+        {/* 3. AUDIO PREFERENCES */}
+        <div style={{ 
+          padding: '24px', 
+          borderTop: '1px solid var(--vs-border)', 
+          background: 'var(--vs-surface)',
+          borderBottomRightRadius: '20px',
+          borderBottomLeftRadius: '20px',
+          display: 'flex', flexDirection: 'column', gap: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--vs-muted)', letterSpacing: '1.2px', fontWeight: '700', margin: 0 }}>
+              Audio Output
+            </h3>
+            <div style={{ fontSize: '13px', color: 'var(--vs-text)', fontWeight: '600' }}>
+              {volume}%
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div style={{ display: 'flex', background: 'var(--vs-bg)', borderRadius: '10px', padding: '4px', border: '1px solid var(--vs-border)' }}>
+              {(['female', 'male'] as const).map((v) => (
+                <button key={v} onClick={() => onVoiceChange(v)} style={{
+                    background: voice === v ? 'var(--vs-surface)' : 'transparent',
+                    color: voice === v ? 'var(--vs-text)' : 'var(--vs-muted)',
+                    border: 'none', padding: '6px 16px', borderRadius: '8px',
+                    fontSize: '13px', fontWeight: '600', cursor: 'pointer', textTransform: 'capitalize',
+                    boxShadow: voice === v ? '0 1px 4px rgba(0,0,0,0.1)' : 'none'
+                  }}>{v}</button>
+              ))}
+            </div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ fontSize: '16px', opacity: 0.5 }}>🔈</span>
+              <input type="range" min="0" max="100" value={volume} onChange={(e) => onVolumeChange(Number(e.target.value))} style={{ flex: 1 }} />
+              <span style={{ fontSize: '16px', opacity: 0.8 }}>🔊</span>
+            </div>
           </div>
         </div>
-
-        {/* Volume Control */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '0 0 auto' }}>
-          <span style={{ fontSize: '18px', cursor: 'pointer' }} onClick={() => onVolumeChange(volume === 0 ? 100 : 0)}>
-            {volume === 0 ? '🔇' : volume < 50 ? '🔉' : '🔊'}
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={volume}
-            onChange={(e) => onVolumeChange(Number(e.target.value))}
-            className="volume-slider"
-          />
-          <span style={{ fontSize: '14px', color: 'var(--vs-muted)', fontWeight: '600', minWidth: '35px', textAlign: 'right' }}>
-            {volume}%
-          </span>
-        </div>
       </div>
-    </div>
     </>
   );
 }

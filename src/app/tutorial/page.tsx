@@ -1,7 +1,8 @@
 "use client";
 
 import Link from 'next/link';
-import ShinyText from '@/src/ui/components/ShinyText';
+// Removed ShinyText import as we are replacing it with standard colored text
+// import ShinyText from '@/src/ui/components/ShinyText'; 
 
 const gestures = [
   { name: "HELLO", icon: "👋", desc: "Wave your hand side-to-side (at least 2 swipes)." },
@@ -42,9 +43,9 @@ export default function TutorialPage() {
         .gesture-card:hover {
           transform: scale(1.05) translateY(-5px);
           border-color: var(--vs-accent);
-          box-shadow: 0 10px 30px -10px rgba(0, 255, 127, 0.4);
+          box-shadow: 0 10px 30px -10px rgba(47, 154, 143, 0.2); /* Adjusted shadow color for light mode safety */
           z-index: 10;
-          background: rgba(255,255,255,0.02);
+          background: var(--vs-surface); /* Ensures card stays solid */
         }
 
         main::-webkit-scrollbar { width: 10px; }
@@ -57,7 +58,7 @@ export default function TutorialPage() {
         }
         .start-btn:hover {
           transform: scale(1.05);
-          box-shadow: 0 0 25px rgba(0, 255, 127, 0.6);
+          box-shadow: 0 0 25px rgba(47, 154, 143, 0.5);
         }
       `}</style>
 
@@ -68,14 +69,24 @@ export default function TutorialPage() {
         color: 'var(--vs-text)',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'system-ui, sans-serif'
+        fontFamily: 'system-ui, sans-serif',
+        paddingTop: '80px' // Keeps the Navbar clearance
       }}>
         {/* CONTENT AREA (Scrollable) */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '40px' }}>
           <div style={{ maxWidth: '1000px', margin: '0 auto 40px auto', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '48px', marginBottom: '10px' }}>
-              <ShinyText text="Gesture Library" speed={3} />
+            
+            {/* UPDATED HEADER: Uses vs-accent to be visible in Light Mode */}
+            <h2 style={{ 
+              fontSize: '48px', 
+              marginBottom: '10px', 
+              color: 'var(--vs-accent)', // <--- Matches the gesture cells
+              fontWeight: '800',
+              letterSpacing: '-1px'
+            }}>
+              Gesture Library
             </h2>
+            
             <p style={{ color: 'var(--vs-muted)', fontSize: '18px' }}>
               Master the signals to communicate with VitalSign AI.
             </p>
@@ -93,7 +104,7 @@ export default function TutorialPage() {
               <div key={g.name} className="gesture-card">
                 <div style={{ fontSize: '48px', marginBottom: '15px' }}>{g.icon}</div>
                 <h3 style={{
-                  color: 'var(--vs-accent)',
+                  color: 'var(--vs-accent)', // This is the color we matched above
                   fontSize: '20px',
                   fontWeight: 'bold',
                   marginBottom: '10px',
@@ -127,13 +138,13 @@ export default function TutorialPage() {
             style={{
               pointerEvents: 'auto',
               background: 'var(--vs-accent)',
-              color: '#000',
+              color: '#000', // Keeps text black for contrast on teal button
               padding: '14px 40px',
               borderRadius: '50px',
               border: 'none',
               fontWeight: 'bold',
               fontSize: '18px',
-              boxShadow: '0 4px 20px rgba(0, 255, 127, 0.4)',
+              boxShadow: '0 4px 20px rgba(47, 154, 143, 0.3)',
               cursor: 'pointer',
             }}
           >
@@ -144,4 +155,3 @@ export default function TutorialPage() {
     </>
   );
 }
-
