@@ -30,7 +30,11 @@ export function CameraPanel({ children }: { children: ReactNode }) {
       </div>
 
       {/* The HandTracker Component goes here */}
-      <div style={{ width: '1250px', height: '650px', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ marginTop: '-80px', width: '1250px', height: '650px', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', 
+                    borderRadius: '24px',  // Adjust this number for more/less roundness
+                    overflow: 'hidden',    // This is CRITICAL to clip the video corners
+                    border: '1px solid var(--vs-border)'
+      }}>
         {children}
       </div>
     </div>

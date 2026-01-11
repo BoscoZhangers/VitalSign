@@ -351,7 +351,11 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
   return (
     <div style={containerStyle}>
       <div style={videoContainerStyle}>
-        <Webcam ref={webcamRef} mirrored={true} style={{ width: '100%', display: 'block' }} />
+        <Webcam 
+          ref={webcamRef} 
+          mirrored={true} 
+          videoConstraints={{ width: 1180, heigt: 520, facingMode: "user"}}
+          style={{ width: '1180px', height: '520px', display: 'block' }} />
         <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
         {!compact && (
           <>
