@@ -1,4 +1,9 @@
 import React from 'react';
 
-declare const HandTracker: React.FC<Record<string, never>>;
+interface HandTrackerProps {
+  onSentenceComplete?: (text: string, emotion?: string) => void;
+  compact?: boolean;
+}
+
+declare const HandTracker: React.FC<HandTrackerProps>;
 export default HandTracker;

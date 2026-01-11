@@ -4,7 +4,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
-export default function HandTracker() {
+export default function HandTracker({ onSentenceComplete, compact = false }) {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const [landmarker, setLandmarker] = useState(null);
@@ -23,6 +23,7 @@ export default function HandTracker() {
   const lastTypedTime = useRef(0);
   const letterStartTime = useRef(0);
   const lastCommittedGesture = useRef(null);
+  const handWasDetected = useRef(false); // Track if hand was previously detected
 
   const HISTORY_SIZE = 15;
   const MOTION_WINDOW_MS = 350;
@@ -168,8 +169,27 @@ export default function HandTracker() {
         if (motionBuffer.current.length > 20) motionBuffer.current.pop();
 
         const rawSign = analyzeASL(lm);
+        // Mark that hand was detected when a gesture is detected (not "...")
+        if (rawSign !== "..." && rawSign !== "No Hand") {
+          handWasDetected.current = true; // Mark that hand was detected
+        }
         debounceAndType(rawSign);
       } else {
+        // Hand moved out of frame - if hand was previously detected and there's text, trigger callback
+        if (handWasDetected.current && onSentenceComplete) {
+          // Capture everything visible in the text box: sentence (all committed words and letters) + pendingLetters (letters not yet committed)
+          // This matches what's shown in the sentencePreview
+          const currentText = (sentence + pendingLettersRef.current).trim();
+          if (currentText.length > 0) {
+            // Trigger callback with all text (words and letters) and current emotion
+            onSentenceComplete(currentText, faceEmotion);
+            // Reset after callback
+            setSentence("");
+            setPendingLetters("");
+            pendingLettersRef.current = "";
+          }
+          handWasDetected.current = false; // Reset flag after callback or if no text
+        }
         setGesture("No Hand");
         gestureHistory.current = [];
       }
@@ -391,6 +411,7 @@ export default function HandTracker() {
 
   useEffect(() => { if (landmarker) predict(); }, [landmarker]);
 
+
   const sentencePreview = (() => {
     // Show committed sentence + a live sequence of stable letters only (no word preview to avoid flicker).
     const base = sentence + pendingLetters;
@@ -400,25 +421,52 @@ export default function HandTracker() {
     return base;
   })();
 
+  // Style based on compact mode
+  const containerStyle = compact 
+    ? { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px' }
+    : { display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#121212', minHeight: '100vh', padding: '20px', color: 'white', fontFamily: 'sans-serif' };
+
+  const videoContainerStyle = compact
+    ? { position: 'relative', width: '100%', maxWidth: '640px', borderRadius: '15px', overflow: 'hidden', border: '2px solid #333', marginBottom: '1rem' }
+    : { position: 'relative', width: '100%', maxWidth: '720px', borderRadius: '15px', overflow: 'hidden', border: '3px solid #333' };
+
+  const textContainerStyle = compact
+    ? { width: '100%', maxWidth: '640px', background: '#f5f5f5', padding: '15px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '1rem' }
+    : { marginTop: '20px', width: '100%', maxWidth: '720px', background: '#1e1e1e', padding: '25px', borderRadius: '15px', border: '1px solid #444' };
+
+  const textStyle = compact
+    ? { color: '#333', margin: '0 0 10px 0', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '1px', fontWeight: '500' }
+    : { color: '#aaa', margin: '0 0 10px 0', textTransform: 'uppercase', fontSize: '12px', letterSpacing: '1px' };
+
+  const previewStyle = compact
+    ? { fontSize: '18px', minHeight: '30px', margin: '0', fontWeight: '500', color: '#333' }
+    : { fontSize: '32px', minHeight: '45px', margin: '0', fontWeight: '500' };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#121212', minHeight: '100vh', padding: '20px', color: 'white', fontFamily: 'sans-serif' }}>
-      <div style={{ position: 'relative', width: '100%', maxWidth: '720px', borderRadius: '15px', overflow: 'hidden', border: '3px solid #333' }}>
-        <Webcam ref={webcamRef} mirrored={true} style={{ width: '100%' }} />
+    <div style={containerStyle}>
+      <div style={videoContainerStyle}>
+        <Webcam ref={webcamRef} mirrored={true} style={{ width: '100%', display: 'block' }} />
         <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
-        <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.6)', padding: '5px 15px', borderRadius: '10px' }}>
-          Live Translation Engine
-        </div>
-        <div style={{ position: 'absolute', top: 20, left: 20, background: 'rgba(0,0,0,0.6)', padding: '5px 15px', borderRadius: '10px' }}>
-          Emotion: {faceEmotion} ({Math.round(faceEmotionConfidence * 100)}%)
-        </div>
-        <div style={{ position: 'absolute', bottom: 30, left: '50%', transform: 'translateX(-50%)', background: '#00FF7F', color: 'black', padding: '12px 35px', borderRadius: '50px', fontSize: '28px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,255,127,0.4)' }}>
-          {gesture}
-        </div>
+        {!compact && (
+          <>
+            <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.6)', padding: '5px 15px', borderRadius: '10px' }}>
+              Live Translation Engine
+            </div>
+            <div style={{ position: 'absolute', top: 20, left: 20, background: 'rgba(0,0,0,0.6)', padding: '5px 15px', borderRadius: '10px' }}>
+              Emotion: {faceEmotion} ({Math.round(faceEmotionConfidence * 100)}%)
+            </div>
+            <div style={{ position: 'absolute', bottom: 30, left: '50%', transform: 'translateX(-50%)', background: '#00FF7F', color: 'black', padding: '12px 35px', borderRadius: '50px', fontSize: '28px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,255,127,0.4)' }}>
+              {gesture}
+            </div>
+          </>
+        )}
       </div>
-      <div style={{ marginTop: '20px', width: '100%', maxWidth: '720px', background: '#1e1e1e', padding: '25px', borderRadius: '15px', border: '1px solid #444' }}>
-        <p style={{ color: '#aaa', margin: '0 0 10px 0', textTransform: 'uppercase', fontSize: '12px', letterSpacing: '1px' }}>Current Sentence</p>
-        <p style={{ fontSize: '32px', minHeight: '45px', margin: '0', fontWeight: '500' }}>{sentencePreview}</p>
-        <button onClick={() => { setSentence(""); setPendingLetters(""); }} style={{ marginTop: '20px', padding: '10px 25px', background: '#ff3b3b', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Clear Text</button>
+      <div style={textContainerStyle}>
+        <p style={textStyle}>Current Sentence</p>
+        <p style={previewStyle}>{sentencePreview}</p>
+        {!compact && (
+          <button onClick={() => { setSentence(""); setPendingLetters(""); }} style={{ marginTop: '20px', padding: '10px 25px', background: '#ff3b3b', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Clear Text</button>
+        )}
       </div>
     </div>
   );
