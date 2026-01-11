@@ -31,11 +31,11 @@ export default function VoicePage() {
     setRefinedText(null);
 
     try {
-      // Build prompt and call Gemini API to refine
+      // Build prompt and call Cohere API to refine
       const basePrompt = 'You are an expressive assistant. You MUST begin every single sentence with an emotion or action tag in square brackets that describes your current tone. Examples: [laughing], [hesitant], [regretful], [excited]. Ensure the tag matches the context of the sentence that follows. Do not add any additional text or commentary besides the [text]. Return ONLY plain text, no markdown, no code blocks, no formatting - just the text itself.';
       const fullPrompt = `${basePrompt}\n\nText to process: "${text.trim()}"${emotion ? `\nEmotion/Tone: ${emotion}` : ''}`;
       
-      const geminiResponse = await fetch("/api/gemini", {
+      const refineResponse = await fetch("/api/cohere", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -43,13 +43,18 @@ export default function VoicePage() {
         body: JSON.stringify({ prompt: fullPrompt }),
       });
 
-      if (!geminiResponse.ok) {
-        const errorData = await geminiResponse.json();
-        throw new Error(errorData.error || "Failed to refine text with Gemini");
+      if (!refineResponse.ok) {
+        const errorData = await refineResponse.json().catch(() => ({}));
+        const message =
+          typeof (errorData as any)?.error === "string" && (errorData as any).error.trim()
+            ? (errorData as any).error
+            : "Failed to refine text with Cohere";
+        const details = typeof (errorData as any)?.details === "string" ? (errorData as any).details.trim() : "";
+        throw new Error(details ? `${message}: ${details}` : message);
       }
 
-      const geminiData = await geminiResponse.json();
-      const refined = geminiData.text.trim();
+      const refineData = await refineResponse.json();
+      const refined = refineData.text.trim();
       
       // Show the refined text for confirmation
       setRefinedText(refined);
@@ -181,7 +186,7 @@ export default function VoicePage() {
             cursor: isLoading || isSpeaking || !text.trim() ? "not-allowed" : "pointer",
           }}
         >
-          {isLoading ? "Refining..." : "Refine with Gemini"}
+          {isLoading ? "Refining..." : "Refine with Cohere"}
         </button>
       </form>
 

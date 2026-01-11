@@ -45,7 +45,7 @@ export default function Home() {
       ]);
 
       try {
-        // 2) Process with Gemini (refine into natural, speakable text)
+        // 2) Process with Cohere (refine into natural, speakable text)
         const basePrompt = [
           'You are a helpful assistant that rewrites sign-language translations into a clear, natural sentence.',
           'Return ONLY plain text. No markdown, no code blocks, no extra commentary.',
@@ -53,19 +53,24 @@ export default function Home() {
         ].join('\n');
 
         const fullPrompt = `${basePrompt}\n\nRaw Text: ${JSON.stringify(raw)}${emotionLabel ? `\nDetected Emotion: ${emotionLabel}` : ''}`;
-        const geminiResponse = await fetch("/api/gemini", {
+        const refineResponse = await fetch("/api/cohere", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: fullPrompt })
         });
 
-        if (!geminiResponse.ok) {
-          const err = await geminiResponse.json().catch(() => ({}));
-          throw new Error(err?.error || "Failed to process with Gemini");
+        if (!refineResponse.ok) {
+          const err = await refineResponse.json().catch(() => ({}));
+          const message =
+            typeof err?.error === "string" && err.error.trim()
+              ? err.error
+              : "Failed to process with Cohere";
+          const details = typeof err?.details === "string" ? err.details.trim() : "";
+          throw new Error(details ? `${message}: ${details}` : message);
         }
 
-        const geminiData = await geminiResponse.json();
-        const refined = String(geminiData?.text ?? "").trim();
+        const refineData = await refineResponse.json();
+        const refined = String(refineData?.text ?? "").trim();
 
         if (refined) {
           // 3) Append the processed text as an AI/system turn

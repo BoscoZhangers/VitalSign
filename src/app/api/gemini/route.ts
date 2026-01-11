@@ -1,12 +1,14 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { CohereClient } from "cohere-ai";
 import { NextResponse } from "next/server";
 
-// Initialize the SDK
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+export const runtime = "nodejs";
+
+// Deprecated route name: kept for compatibility.
+// Implementation now uses Cohere. Prefer calling /api/cohere.
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.COHERE_API_KEY) {
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
     }
 
@@ -16,18 +18,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
-    });
-    
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const cohere = new CohereClient({ token: process.env.COHERE_API_KEY });
+    const model = (process.env.COHERE_MODEL ?? "command-a-03-2025").trim() || "command-a-03-2025";
+    const result = await cohere.chat({ model, message: prompt });
+    const text = String(result.text ?? "");
 
     return NextResponse.json({ text });
     
   } catch (error: any) {
-    console.error("Gemini API Error:", error.message);
+    console.error("Cohere API Error:", error?.message ?? error?.body ?? error);
     
     return NextResponse.json(
       { error: "Failed to generate content", details: error.message },
