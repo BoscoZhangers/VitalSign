@@ -6,6 +6,7 @@ dist/
 .DS_Store
 
 tsconfig.tsbuildinfo
+ore
 
 .env
 .env.*
