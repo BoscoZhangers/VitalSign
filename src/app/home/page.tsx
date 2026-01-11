@@ -22,7 +22,7 @@ export default function HomePage() {
       height: '100vh',
       margin: 0,
       padding: 0,
-      background: '#000000',
+      background: 'var(--vs-bg)',
       overflow: 'hidden'
     }}>
       {/* PixelBlast Background */}
@@ -45,7 +45,7 @@ export default function HomePage() {
           }}
           variant="circle"
           pixelSize={6}
-          color="#E5E5E5"
+          color="#DC143C"
           patternScale={3}
           patternDensity={1.2}
           pixelSizeJitter={0.5}
@@ -74,15 +74,15 @@ export default function HomePage() {
         fontFamily: '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
-        textShadow: '0 0 30px rgba(255, 255, 255, 0.3), 0 0 60px rgba(255, 255, 255, 0.2), 0 0 90px rgba(255, 255, 255, 0.1)',
+        textShadow: `0 0 30px rgba(var(--vs-accent-rgb), 0.4), 0 0 60px rgba(var(--vs-accent-rgb), 0.2), 0 0 90px rgba(var(--vs-accent-rgb), 0.1)`,
         pointerEvents: 'none'
       }}>
         <ShinyText
           text="Vital Sign"
           speed={2}
           delay={0}
-          color="#E5E5E5"
-          shineColor="#FFFFFF"
+          color="var(--vs-text)"
+          shineColor="#7DD3FC"
           spread={120}
           direction="left"
           yoyo={false}
@@ -114,7 +114,7 @@ export default function HomePage() {
           <span style={{
             fontSize: '24px',
             fontWeight: '400',
-            color: '#E5E5E5',
+            color: 'var(--vs-text)',
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
             fontFamily: '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
