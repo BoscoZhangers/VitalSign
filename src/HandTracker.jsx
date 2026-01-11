@@ -11,15 +11,21 @@ export default function HandTracker() {
   const [gesture, setGesture] = useState("No Hand");
   const [sentence, setSentence] = useState("");
   const [pendingLetters, setPendingLetters] = useState("");
+  const pendingLettersRef = useRef("");
 
   // HISTORY FOR DEBOUNCING AND MOTION
   const gestureHistory = useRef([]);
   const motionBuffer = useRef([]); 
   const lastTypedTime = useRef(0);
   const letterStartTime = useRef(0);
+  const lastCommittedGesture = useRef(null);
 
   const HISTORY_SIZE = 15;
-  const MOTION_WINDOW_MS = 250;
+  const MOTION_WINDOW_MS = 350;
+
+  useEffect(() => {
+    pendingLettersRef.current = pendingLetters;
+  }, [pendingLetters]);
 
   const classifyGesture = (g) => {
     if (!g || g === "..." || g === "No Hand") {
@@ -30,7 +36,7 @@ export default function HandTracker() {
     }
     if (g === "HELLO" || g === "YES" || g === "NO") {
       // Prefer words over letters: lower stability requirement + higher vote weight.
-      return { kind: "word", baseWeight: 2.3, minCount: 6, typeMinCount: 6, typeDelayMs: 850 };
+      return { kind: "word", baseWeight: 2.5, minCount: 4, typeMinCount: 3, typeDelayMs: 550 };
     }
     // Letters: require higher confidence to actually *type*.
     return { kind: "letter", baseWeight: 1.0, minCount: 10, typeMinCount: 13, typeDelayMs: 1200 };
@@ -90,6 +96,7 @@ export default function HandTracker() {
         debounceAndType(rawSign);
       } else {
         setGesture("No Hand");
+        gestureHistory.current = [];
       }
     }
     requestAnimationFrame(predict);
@@ -124,38 +131,52 @@ export default function HandTracker() {
     }
     const dx = wrist.x - oldPos.x;
     const dy = wrist.y - oldPos.y;
+    // Align motion direction with UI (Webcam is mirrored in view)
+    const dxView = -dx; // right swipe in UI => dxView > 0
   
     // HELLO Requirement: Wide open hand (Thumb OUT) + deliberate horizontal movement
     const isThumbOut = dist(thumbT, indexK) > handScale * 0.6;
     const isHandWideOpen = f1 && f2 && f3 && f4 && isThumbOut;
   
-    // BACKSPACE: Swipe left with open hand
-    if (isHandWideOpen && dx < -0.18) return "BACKSPACE";
+    // BACKSPACE: Swipe left with open hand in UI
+    if (isHandWideOpen && dxView < -0.14) return "BACKSPACE";
 
-    // HELLO: Swipe right with open hand (avoid colliding with BACKSPACE)
-    if (isHandWideOpen && dx > 0.15) return "HELLO";
+    // HELLO: Swipe right with open hand in UI (favor motion over static C)
+    if (isHandWideOpen && dxView > 0.08) return "HELLO";
   
-    // YES: Fist nodding vertically
-    if (!f1 && !f2 && !f3 && !f4 && Math.abs(dy) > 0.05 && thumbT.y < wrist.y) return "YES";
-  
-    // --- 2. ORIENTATION LOGIC (SPACE / NO) ---
+    // --- 2. GESTURE LOGIC (YES / SPACE / NO) ---
     
-    // SPACE: Thumbs Up
-    if (!f1 && !f2 && !f3 && !f4 && thumbT.y < indexK.y - (handScale * 0.5)) return "SPACE";
+    // YES: Fist with vertical motion (check BEFORE static SPACE)
+    const isFist = !f1 && !f2 && !f3 && !f4;
+    if (isFist && Math.abs(dy) > 0.06) return "YES";
+    
+    // SPACE: Thumbs Up (static, no motion)
+    if (isFist && thumbT.y < indexK.y - (handScale * 0.5) && Math.abs(dy) < 0.03) return "SPACE";
   
     // NO: Thumbs Down
     if (!f1 && !f2 && !f3 && !f4 && thumbT.y > wrist.y + (handScale * 0.2)) return "NO";
   
     // --- 3. STATIC ALPHABET LOGIC ---
+
+    // O detection (avoid misclassifying as C): thumb-index tips close and fingers curved
+    const thumbIndexGap = dist(thumbT, indexT);
+    const indexMiddleGap = dist(indexT, middleT);
+    const fingerLength = dist(middleT, middleK);
+    if (f1 && f2 && f3 && f4) {
+      // Loosen thresholds to better capture circular shape
+      if (thumbIndexGap < handScale * 0.40 && indexMiddleGap < handScale * 0.55 && fingerLength < handScale * 0.85) {
+        return "O";
+      }
+    }
   
     // C vs B Differentiation (make B less prevalent)
     if (f1 && f2 && f3 && f4) {
       const thumbToMiddle = dist(thumbT, middleT);
-      const fingerLength = dist(middleT, middleK);
+      const fingerLen = dist(middleT, middleK);
       // C: Thumb closer to tips + finger foreshortening
-      if (thumbToMiddle < handScale * 0.85 && fingerLength < handScale * 0.65) return "C";
+      if (thumbToMiddle < handScale * 0.85 && fingerLen < handScale * 0.65) return "C";
       // B: Only if fingers are very straight and thumb is far from tips
-      if (fingerLength > handScale * 0.8 && thumbToMiddle > handScale * 0.9) return "B";
+      if (fingerLen > handScale * 0.8 && thumbToMiddle > handScale * 0.9) return "B";
       // If ambiguous, prefer C
       return "C";
     }
@@ -229,7 +250,23 @@ export default function HandTracker() {
       });
     }
 
-    // 3. Update the UI Label
+    // 3a. Immediate commit for words (avoid hold-time for motion-based gestures)
+    const now = Date.now();
+    const timeSinceLastTypeImmediate = now - lastTypedTime.current;
+    // Only commit if it's a different gesture or enough time has passed
+    if (bestMeta.kind === "word" && bestEntry.count >= bestMeta.typeMinCount && 
+        (lastCommittedGesture.current !== best || timeSinceLastTypeImmediate > 2000)) {
+      setSentence(prev => applyGestureToSentence(prev + pendingLettersRef.current, best));
+      pendingLettersRef.current = "";
+      setPendingLetters("");
+      setGesture(best);
+      lastTypedTime.current = now;
+      letterStartTime.current = now;
+      lastCommittedGesture.current = best;
+      return; // Skip hold-based typing path
+    }
+
+    // 3b. Update the UI Label
     if (bestEntry.count >= bestMeta.minCount && best !== gesture) {
       setGesture(best);
       letterStartTime.current = Date.now();
@@ -247,9 +284,14 @@ export default function HandTracker() {
     const confidentEnoughToType = activeCount >= activeMeta.typeMinCount;
 
     if (gesture !== "..." && gesture !== "No Hand" && confidentEnoughToType && timeHeld > delay && timeSinceLastType > cooldown) {
-      setSentence(prev => applyGestureToSentence(prev, gesture));
+      setSentence(prev => {
+        const base = activeMeta.kind === "letter" ? prev : prev + pendingLettersRef.current;
+        return applyGestureToSentence(base, gesture);
+      });
+      pendingLettersRef.current = "";
       setPendingLetters("");
       lastTypedTime.current = Date.now();
+      lastCommittedGesture.current = gesture;
     }
   };
 
@@ -275,17 +317,10 @@ export default function HandTracker() {
   useEffect(() => { if (landmarker) predict(); }, [landmarker]);
 
   const sentencePreview = (() => {
-    // Show committed sentence + a live sequence of stable letters.
+    // Show committed sentence + a live sequence of stable letters only (no word preview to avoid flicker).
     const base = sentence + pendingLetters;
     if (!base && (!gesture || gesture === "..." || gesture === "No Hand")) {
       return "Start signing to build a sentence…";
-    }
-    // For words/commands, preview them on top of the base string.
-    if (gesture && gesture !== "..." && gesture !== "No Hand") {
-      const meta = classifyGesture(gesture);
-      if (meta.kind === "word" || meta.kind === "command") {
-        return applyGestureToSentence(base, gesture);
-      }
     }
     return base;
   })();
