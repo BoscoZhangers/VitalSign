@@ -26,8 +26,9 @@ async function playAudioInBrowser(audioBuffer: ArrayBuffer): Promise<void> {
  * Simple function that takes text and automatically plays it using ElevenLabs REST API
  * Uses direct fetch instead of SDK to avoid Node.js dependencies
  * @param text - The text to convert to speech and play
+ * @param voiceId - Optional voice ID (defaults to girl voice)
  */
-export async function speakText(text: string): Promise<void> {
+export async function speakText(text: string, voiceId?: string): Promise<void> {
   // Use NEXT_PUBLIC_ prefix because this runs in the browser (client-side)
   const apiKey = process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY;
   
@@ -37,8 +38,9 @@ export async function speakText(text: string): Promise<void> {
     );
   }
 
-  const voiceId = "JBFqnCBsd6RMkjVDRZzb";
-  const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  // Default to girl voice if not provided
+  const selectedVoiceId = voiceId || "kdmDKE6EkgrWrrykO9Qt";
+  const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`;
 
   const response = await fetch(apiUrl, {
     method: "POST",
@@ -51,8 +53,7 @@ export async function speakText(text: string): Promise<void> {
       text: text.trim(),
       model_id: "eleven_v3",
       voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
+        stability: 0,
       },
     }),
   });

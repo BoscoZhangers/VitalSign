@@ -3,9 +3,15 @@
 import { useState } from "react";
 import { speakText } from "@/src/modules/elevenlabs";
 
+const VOICES = {
+  girl: { id: "kdmDKE6EkgrWrrykO9Qt", label: "Girl Voice" },
+  guy: { id: "iP95p4xoKVk53GoZ742B", label: "Guy Voice" },
+};
+
 export default function VoicePage() {
   const [text, setText] = useState("");
   const [emotion, setEmotion] = useState("");
+  const [voice, setVoice] = useState<"girl" | "guy">("girl");
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,8 +67,9 @@ export default function VoicePage() {
     setError(null);
 
     try {
-      // Speak the confirmed refined text using ElevenLabs
-      await speakText(refinedText);
+      // Speak the confirmed refined text using ElevenLabs with selected voice
+      const voiceId = VOICES[voice].id;
+      await speakText(refinedText, voiceId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred while speaking");
       console.error("Error:", err);
@@ -105,6 +112,33 @@ export default function VoicePage() {
             opacity: isLoading || isSpeaking ? 0.6 : 1,
           }}
         />
+        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          <label style={{ fontSize: "1rem", fontWeight: "500" }}>Voice:</label>
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: isLoading || isSpeaking ? "not-allowed" : "pointer" }}>
+              <input
+                type="radio"
+                name="voice"
+                value="girl"
+                checked={voice === "girl"}
+                onChange={(e) => setVoice(e.target.value as "girl" | "guy")}
+                disabled={isLoading || isSpeaking}
+              />
+              <span style={{ opacity: isLoading || isSpeaking ? 0.6 : 1 }}>Girl</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: isLoading || isSpeaking ? "not-allowed" : "pointer" }}>
+              <input
+                type="radio"
+                name="voice"
+                value="guy"
+                checked={voice === "guy"}
+                onChange={(e) => setVoice(e.target.value as "girl" | "guy")}
+                disabled={isLoading || isSpeaking}
+              />
+              <span style={{ opacity: isLoading || isSpeaking ? 0.6 : 1 }}>Guy</span>
+            </label>
+          </div>
+        </div>
         {error && (
           <div
             style={{
