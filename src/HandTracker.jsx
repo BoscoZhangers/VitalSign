@@ -29,7 +29,6 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
     if (!g || g === "..." || g === "No Hand") {
       return { kind: "none", baseWeight: 0, minCount: Infinity, typeMinCount: Infinity, typeDelayMs: Infinity };
     }
-    // All target words (including LOVE) use stable "word" settings
     return { kind: "word", baseWeight: 2.5, minCount: 5, typeMinCount: 5, typeDelayMs: 600 };
   };
 
@@ -158,7 +157,7 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
     // Normalization scale
     const handScale = dist(wrist, middleK);
   
-    // Extended Logic (Tip further from wrist than Knuckle)
+    // Extended Logic
     const isExtended = (tip, knuckle) => dist(tip, wrist) > dist(knuckle, wrist) + (handScale * 0.15);
     
     const f1 = isExtended(indexT, indexK); // Index
@@ -181,7 +180,7 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
     }
     
     const dx = endPos.x - startPos.x;
-    const dy = endPos.y - startPos.y; // Positive dy means DOWN
+    const dy = endPos.y - startPos.y; 
     const dxView = -dx; 
 
     // --- "HELLO" (Wave) ---
@@ -201,13 +200,35 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
 
     // --- STATIC GESTURES ---
 
-    // Check Thumb Extension (needed for YES, LOVE)
     const isThumbOut = dist(thumbT, indexK) > handScale * 0.6;
+    const isSideways = Math.abs(wrist.x - middleK.x) > Math.abs(wrist.y - middleK.y);
+
+    // --- "HELP" (Signal for Help - Stage 1) ---
+    // 4 Fingers Open + Thumb Tucked (Not extended)
+    if (isPalmOpen && !isThumbOut) {
+        return "HELP";
+    }
 
     // --- "LOVE" (ILY Sign) ---
-    // Index + Pinky + Thumb are Extended. Middle + Ring are Curled.
     if (f1 && !f2 && !f3 && f4 && isThumbOut) {
         return "LOVE";
+    }
+
+    // --- "CALL" ---
+    if (!f1 && !f2 && !f3 && f4 && isThumbOut) {
+        if (isSideways) return "CALL";
+    }
+
+    // --- "ME" (Pointing at self with thumb) ---
+    if (!f1 && !f2 && !f3 && !f4) {
+        const isThumbMostlyOut = dist(thumbT, indexK) > handScale * 0.4;
+        if (isThumbMostlyOut) {
+            const isHorizontal = Math.abs(thumbT.y - indexK.y) < handScale * 0.5;
+            // Ensure pointing inward (Thumb tip between wrist/pinky X plane)
+            const isPointingIn = Math.abs(thumbT.x - pinkyK.x) < Math.abs(thumbT.x - indexK.x) || 
+                                 Math.abs(thumbT.x - wrist.x) < handScale * 0.3;
+            if (isHorizontal) return "ME";
+        }
     }
 
     // --- "YES" (Thumbs Up) ---
@@ -225,7 +246,7 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
     }
 
     // --- "I" (Pinky Up) ---
-    if (!f1 && !f2 && !f3 && f4) {
+    if (!f1 && !f2 && !f3 && f4 && !isThumbOut) {
         return "I";
     }
 
@@ -253,7 +274,6 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
     const now = Date.now();
     const timeSinceLastType = now - lastTypedTime.current;
     
-    // Commit if stable and (different gesture OR enough time passed)
     if (best !== "..." && best !== "No Hand" && count >= meta.minCount && 
        (lastCommittedGesture.current !== best || timeSinceLastType > 2000)) {
        
