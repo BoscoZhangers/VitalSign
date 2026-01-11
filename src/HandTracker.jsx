@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+import { loadEmotionModels, detectEmotion } from '@/src/modules/emotion';
 
 export default function HandTracker({ onSentenceComplete, compact = false }) {
   const webcamRef = useRef(null);
@@ -13,7 +14,6 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
   const [faceEmotion, setFaceEmotion] = useState("Neutral");
   const [faceEmotionConfidence, setFaceEmotionConfidence] = useState(0);
   const emotionInFlight = useRef(false);
-  const lastControllerRef = useRef(null);
   const lastEmotionUpdatedAt = useRef(0);
 
   // RAF loop reads from refs (state values would be stale inside the loop)
@@ -62,6 +62,14 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
 
   useEffect(() => {
     const initAI = async () => {
+      // Load face-api.js emotion models
+      try {
+        await loadEmotionModels();
+      } catch (err) {
+        console.error('Failed to load emotion models:', err);
+      }
+
+      // Load MediaPipe hand landmarker
       const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
       const nl = await HandLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
@@ -72,49 +80,20 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
     initAI();
   }, []);
 
-  const captureFrameDataUrl = () => {
-    const video = webcamRef.current?.video;
-    if (!video || video.readyState !== 4) return null;
-    const w = video.videoWidth;
-    const h = video.videoHeight;
-    const MAX_DIM = 256;
-    const scale = Math.min(1, MAX_DIM / Math.max(w, h));
-    const outW = Math.max(1, Math.round(w * scale));
-    const outH = Math.max(1, Math.round(h * scale));
-    const off = document.createElement("canvas");
-    off.width = outW;
-    off.height = outH;
-    const ctx = off.getContext("2d");
-    if (!ctx) return null;
-    ctx.translate(outW, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, outW, outH);
-    return off.toDataURL("image/jpeg", 0.6);
-  };
-
   const detectFaceEmotion = async () => {
     if (emotionInFlight.current) return;
-    const imageDataUrl = captureFrameDataUrl();
-    if (!imageDataUrl) return;
+    const video = webcamRef.current?.video;
+    if (!video || video.readyState !== 4) return;
 
-    const controller = new AbortController();
-    lastControllerRef.current = controller;
     emotionInFlight.current = true;
     try {
-      const res = await fetch("/api/emotion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageDataUrl }),
-        signal: controller.signal
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data?.emotion) setFaceEmotion(data.emotion);
-      if (typeof data?.confidence === "number") setFaceEmotionConfidence(data.confidence);
+      const result = await detectEmotion(video);
+      if (result?.emotion) setFaceEmotion(result.emotion);
+      if (typeof result?.confidence === 'number') setFaceEmotionConfidence(result.confidence);
       lastEmotionUpdatedAt.current = Date.now();
     } catch (err) {
+      console.error('Emotion detection error:', err);
     } finally {
-      if (lastControllerRef.current === controller) lastControllerRef.current = null;
       emotionInFlight.current = false;
     }
   };
@@ -127,10 +106,6 @@ export default function HandTracker({ onSentenceComplete, compact = false }) {
     }, 1500);
     return () => {
       clearInterval(id);
-      try {
-        if (lastControllerRef.current) lastControllerRef.current.abort();
-      } catch (e) {}
-      lastControllerRef.current = null;
       emotionInFlight.current = false;
     };
   }, []);
