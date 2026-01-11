@@ -19,3 +19,20 @@ export type SpeakRequest = {
   text: string;
   tone: ToneTag;
 };
+
+export type EmotionLabel =
+  | "Neutral"
+  | "Happy"
+  | "Sad"
+  | "Angry";
+
+export type EmotionRequest = {
+  /** A browser data URL like: data:image/jpeg;base64,... */
+  imageDataUrl: string;
+};
+
+export type EmotionResponse = {
+  emotion: EmotionLabel;
+  /** 0..1 */
+  confidence: number;
+};

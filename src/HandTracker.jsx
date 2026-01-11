@@ -11,7 +11,11 @@ export default function HandTracker() {
   const [gesture, setGesture] = useState("No Hand");
   const [sentence, setSentence] = useState("");
   const [pendingLetters, setPendingLetters] = useState("");
+  const [faceEmotion, setFaceEmotion] = useState("Neutral");
+  const [faceEmotionConfidence, setFaceEmotionConfidence] = useState(0);
   const pendingLettersRef = useRef("");
+  const emotionInFlight = useRef(false);
+  const lastControllerRef = useRef(null);
 
   // HISTORY FOR DEBOUNCING AND MOTION
   const gestureHistory = useRef([]);
@@ -75,6 +79,77 @@ export default function HandTracker() {
       setLandmarker(nl);
     };
     initAI();
+  }, []);
+
+  const captureFrameDataUrl = () => {
+    const video = webcamRef.current?.video;
+    if (!video || video.readyState !== 4) return null;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) return null;
+
+    // Downscale to reduce payload and latency (max dimension ~256px)
+    const MAX_DIM = 256;
+    const scale = Math.min(1, MAX_DIM / Math.max(w, h));
+    const outW = Math.max(1, Math.round(w * scale));
+    const outH = Math.max(1, Math.round(h * scale));
+
+    const off = document.createElement("canvas");
+    off.width = outW;
+    off.height = outH;
+    const ctx = off.getContext("2d");
+    if (!ctx) return null;
+
+    // Match the user-facing mirrored view while drawing scaled image.
+    ctx.translate(outW, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, outW, outH);
+
+    // Lower quality to keep payloads small.
+    return off.toDataURL("image/jpeg", 0.6);
+  };
+
+  const detectFaceEmotion = async () => {
+    // Abort any in-flight request so we can prioritize the newest frame.
+    try {
+      if (lastControllerRef.current) {
+        try { lastControllerRef.current.abort(); } catch (e) {}
+      }
+    } catch (e) {}
+    const imageDataUrl = captureFrameDataUrl();
+    if (!imageDataUrl) return;
+
+    const controller = new AbortController();
+    lastControllerRef.current = controller;
+    emotionInFlight.current = true;
+    try {
+      const res = await fetch("/api/emotion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageDataUrl }),
+        signal: controller.signal
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.emotion) setFaceEmotion(data.emotion);
+      if (typeof data?.confidence === "number") setFaceEmotionConfidence(data.confidence);
+    } catch (err) {
+      // Abort or network failures are expected occasionally; ignore silently.
+    } finally {
+      // Clear controller only if it's the one we created.
+      if (lastControllerRef.current === controller) lastControllerRef.current = null;
+      emotionInFlight.current = false;
+    }
+  };
+
+  useEffect(() => {
+    // Poll faster for more responsive emotion updates (1s).
+    const id = setInterval(() => {
+      const video = webcamRef.current?.video;
+      if (!video || video.readyState !== 4) return;
+      detectFaceEmotion();
+    }, 1000);
+    return () => clearInterval(id);
   }, []);
 
   const predict = () => {
@@ -332,6 +407,9 @@ export default function HandTracker() {
         <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
         <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.6)', padding: '5px 15px', borderRadius: '10px' }}>
           Live Translation Engine
+        </div>
+        <div style={{ position: 'absolute', top: 20, left: 20, background: 'rgba(0,0,0,0.6)', padding: '5px 15px', borderRadius: '10px' }}>
+          Emotion: {faceEmotion} ({Math.round(faceEmotionConfidence * 100)}%)
         </div>
         <div style={{ position: 'absolute', bottom: 30, left: '50%', transform: 'translateX(-50%)', background: '#00FF7F', color: 'black', padding: '12px 35px', borderRadius: '50px', fontSize: '28px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,255,127,0.4)' }}>
           {gesture}
