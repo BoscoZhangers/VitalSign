@@ -15,7 +15,7 @@ For Deaf and non-verbal individuals, digital communication often strips away the
 
 We didn't want to build just another translator. We wanted to build a communication co-pilot—one that understands not just what you are saying, but how you are feeling, restoring the emotional bridge that is often lost in translation.
 
-Try it out live at: vital-sign-nine.vercel.app
+Try it out live [here](vital-sign-nine.vercel.app)!
 
 <br>
 
